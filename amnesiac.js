@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2017 True Holding Ltd.
+ * Copyright (C) 2017 Zipper Global Ltd.	
  *
  * Commercial License Usage
  *
  * Licensees holding valid commercial Zipper licenses may use this file in
  * accordance with the terms contained in written agreement between you and
- * True Holding Ltd.
+ * Zipper Global Ltd.
  *
  * GNU Affero General Public License Usage
  *
@@ -41,41 +41,46 @@ var express = require('express');
 var cors = require('cors');
 var app = express();
 var bodyParser = require('body-parser');
+const crypto = require('crypto');
 var secp256k1 = require('secp256k1');
-var crypto = require('crypto');
+var shajs = require('sha.js');
+var AWS = require('aws-sdk')
 
+
+var myCredentials = new AWS.SharedIniFileCredentials({profile: 'default'});
+var awsconfig = new AWS.Config({
+  credentials: myCredentials, region: 'eu-west-1'
+});
+
+var s3 = new AWS.S3({params: 'fms'})
 app.use(cors());
 app.use(bodyParser.json()); // support json encoded bodies
 
-// pubkey to nonces
-var nonces = {} 
-var values = {}
-
-// nonce values given must always be bigger than most recent one
-
-/**
- * /set 
- * { 'signature' : hex, 'recovery' : integer, 'nonce' : hex, 'value' : hex }
- */
- 
-app.post('/set', function (req, res) {
-    var signature = Buffer.from(req.body.signature, 'hex');
-    var recovery = req.body.recovery;
-    var hash = crypto.createHash('sha256').update(Buffer.from(req.body.nonce, 'hex')).update(Buffer.from(req.body.value, 'hex')).digest();
-
-    var pubkey = secp256k1.recover(hash, signature, recovery).toString('hex');    
-    var nonce = parseInt(req.body.nonce, 16);
-    
-    if (pubkey in nonces) {
-       currentnonce = nonces[pubkey];
-       if (currentnonce > nonce)
-       {
-          // reject tx, this nonce isn't high enough
-          return;
-       }
+app.post('/store', function (req, res) {
+    if (req.body.data.length > 512) {
+      res.send(JSON.stringify({'status': 'error'}))
+      return
     }
-    nonces[pubkey] = nonce;
-    values[pubkey] = req.body.value;
+    // XXX validate this is valid public keys
+    var authpubkey = req.body.authpubkey
+    var data = req.body.data
+    var revokepubkey = req.body.revokepubkey
+
+    if (authpubkey === revokepubkey) {
+      res.send(JSON.stringify({'status': 'error'}))
+      return
+    }
+
+    var s3key_authpubkey = crypto.createHash('sha256').update(Buffer.from(req.body.authpubkey, 'hex')).digest().toString('hex')
+    var s3key_revokepubkey = crypto.createHash('sha256').update(Buffer.from(req.body.revokepubkey, 'hex')).digest().toString('hex')
+    console.log(s3key_authpubkey)
+    let params_1 = {Bucket: 'zg-fms', Key: s3key_authpubkey, Body: JSON.stringify(data)}
+    s3.upload(params_1, function(err, data) {
+       let params_2 = {Bucket: 'zg-fms', Key: s3key_revokepubkey, Body: Buffer.from(s3key_authpubkey, 'hex')}
+       s3.upload(params_2, function(err, data) {
+          res.send(JSON.stringify({'status': 'ok'}))
+       })
+    })
 });
 
 /*
@@ -84,38 +89,49 @@ app.post('/set', function (req, res) {
  * returns the stored value
 */
  
-app.post('/value', function (req, res) {
-    var signature = Buffer.from(req.body.signature, 'hex');
+app.post('/fetch', function (req, res) {
+    var signature = Buffer.from(req.body.sig, 'hex');
     var recovery = req.body.recovery;
-    var hash = crypto.createHash('sha256').update(Buffer.from(req.body.nonce, 'hex')).digest();
 
-    var pubkey = secp256k1.recover(hash, signature, recovery).toString('hex');    
-    var nonce = parseInt(req.body.nonce, 16);
+    var hash = crypto.createHash('sha256').update(req.body.timestamp).digest();
+    // XXX check that timestamp is within acceptable timing of now
+    var pubkey = secp256k1.publicKeyConvert(secp256k1.recover(hash, signature, recovery), false);
     
-    if (pubkey in nonces) {
-       currentnonce = nonces[pubkey];
-       if (currentnonce > nonce)
-       {
-          // reject tx, this nonce isn't high enough
-          return;
-       }
-    }
-    nonces[pubkey] = nonce;
-    req.send(values[pubkey]);
+    var s3key_authpubkey = crypto.createHash('sha256').update(pubkey).digest().toString('hex')
+    console.log(s3key_authpubkey)
+    
+    let params_1 = {Bucket: 'zg-fms', Key: s3key_authpubkey}
+    s3.getObject(params_1).promise().then((data) => {
+      res.send(JSON.stringify({'data' : JSON.parse(data.Body)}))
+    }).catch((err) => {
+      console.log(err)
+    })
 });
 
-/*
- * /nonce
- * { 'pubkey' : 'hex' }
- * returns the current nonce
-*/
- 
-app.post('/nonce', function (req, res) {
-    var signature = Buffer.from(req.body.signature, 'hex');
+app.post('/revoke', function (req, res) {
+    var signature = Buffer.from(req.body.sig, 'hex');
     var recovery = req.body.recovery;
-    var hash = crypto.createHash('sha256').update(Buffer.from(req.body.nonce, 'hex')).digest();
+    var hash = crypto.createHash('sha256').update(req.body.timestamp).digest();
 
-    req.send(nonces[pubkey]);
+    var pubkey = secp256k1.publicKeyConvert(secp256k1.recover(hash, signature, recovery), false);
+    var s3key_revokepubkey = crypto.createHash('sha256').update(pubkey).digest().toString('hex')
+
+    let params_1 = {Bucket: 'zg-fms', Key: s3key_revokepubkey}
+    s3.getObject(params_1).promise().then((data) => {
+      let params_2 = {Bucket: 'zg-fms', Key: data.Body.toString('hex')}
+      console.log(data.Body.toString('hex'))
+      s3.deleteObject(params_2).promise().then((data) => {
+        s3.deleteObject(params_1).promise().then((data) => {
+          res.send(JSON.stringify({'status' : 'ok'}))
+        }).catch((err) => {
+          console.log(err)
+        })
+      }).catch((err) => {
+        console.log(err)
+      })
+    }).catch((err) => {
+      console.log(err)
+    })
 });
 
 
