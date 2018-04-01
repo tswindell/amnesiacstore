@@ -51,7 +51,7 @@ async function test()
     console.log(JSON.stringify(response))
     
     var url = 'http://localhost:8081/fetch'
-    let timestamp = new Date()
+    let timestamp = new Date().now()
     let hash = shajs('sha256').update(timestamp.toString()).digest()
     let sig = secp256k1.sign(hash, authkey)
     var fms_bundle = { 'hash': hash.toString('hex'), 'timestamp' : timestamp.toString(), 'sig' : sig.signature, 'recovery' : sig.recovery }
