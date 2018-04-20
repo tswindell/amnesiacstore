@@ -75,11 +75,15 @@ app.post('/store', function (req, res) {
     var s3key_revokepubkey = crypto.createHash('sha256').update(Buffer.from(req.body.revokepubkey, 'hex')).digest().toString('hex')
     console.log(s3key_authpubkey)
     let params_1 = {Bucket: 'zg-fms', Key: s3key_authpubkey, Body: JSON.stringify(data)}
-    s3.upload(params_1, function(err, data) {
+    s3.upload(params_1).promise().then((data) => {
        let params_2 = {Bucket: 'zg-fms', Key: s3key_revokepubkey, Body: Buffer.from(s3key_authpubkey, 'hex')}
-       s3.upload(params_2, function(err, data) {
+       s3.upload(params_2).promise().then((data) => {
           res.send(JSON.stringify({'status': 'ok'}))
+       }).catch((err) => {
+          res.send(JSON.stringify({'error': err}))
        })
+    }).catch((err) => {
+      res.send(JSON.stringify({'error': err}))
     })
 });
 
@@ -104,7 +108,7 @@ app.post('/fetch', function (req, res) {
     s3.getObject(params_1).promise().then((data) => {
       res.send(JSON.stringify({'data' : JSON.parse(data.Body)}))
     }).catch((err) => {
-      console.log(err)
+      res.send(JSON.stringify({'error': err}))
     })
 });
 
@@ -124,19 +128,22 @@ app.post('/revoke', function (req, res) {
         s3.deleteObject(params_1).promise().then((data) => {
           res.send(JSON.stringify({'status' : 'ok'}))
         }).catch((err) => {
-          console.log(err)
+          res.send(JSON.stringify({'error': err}))
         })
       }).catch((err) => {
-        console.log(err)
+        res.send(JSON.stringify({'error': err}))
       })
     }).catch((err) => {
-      console.log(err)
+      res.send(JSON.stringify({'error': err}))
     })
 });
 
+app.post('/health', function (req, res) {
+  res.send(JSON.stringify({'notdead' : true}))
+})
 
 var server = app.listen(8081, "0.0.0.0", function () {
   var host = server.address().address
   var port = server.address().port
-  console.log("Example app listening at http://%s:%s", host, port)
+  console.log("Amnesiac app listening at http://%s:%s", host, port)
 })
