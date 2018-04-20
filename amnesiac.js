@@ -138,7 +138,7 @@ app.post('/revoke', function (req, res) {
     })
 });
 
-app.post('/health', function (req, res) {
+app.get('/health', function (req, res) {
   res.send(JSON.stringify({'notdead' : true}))
 })
 
