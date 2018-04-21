@@ -102,14 +102,14 @@ async function test()
     var fms_bundle = {}
     var xhrPromise = new XMLHttpRequestPromise()
     let response5 = await xhrPromise.send({
-      'method': 'POST',
+      'method': 'GET',
       'url': url,
       'headers': {
         'Content-Type': 'application/json;charset=UTF-8'
       },
       'data': JSON.stringify(fms_bundle)
     })
-    console.log('health response ' + JSON.stringify(response4))
+    console.log('health response ' + JSON.stringify(response5))
 }
 
 test().then(() => {}).catch((error) => {
