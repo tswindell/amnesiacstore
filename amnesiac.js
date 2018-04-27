@@ -138,6 +138,39 @@ app.post('/revoke', function (req, res) {
     })
 });
 
+app.post('/perma_store', function (req, res) {
+    if (req.body.data.length > 2048) {
+      res.send(JSON.stringify({'status': 'error'}))
+      return
+    }
+
+    var signature = Buffer.from(req.body.sig, 'hex')
+    var recovery = req.body.recovery
+    var hash = crypto.createHash('sha256').update(Buffer.from(req.body.data, 'hex')).digest()
+    var pubkey = secp256k1.publicKeyConvert(secp256k1.recover(hash, signature, recovery), false);
+    var s3key_pubkeyhash = crypto.createHash('sha256').update(pubkey).digest().toString('hex')
+    var data = { sig: req.body.sig, recovery: req.body.recovery, data: req.body.data }
+    let params_1 = {Bucket: 'z-permastore', Key: s3key_pubkeyhash, Body: JSON.stringify(data)}
+    
+    s3.upload(params_1).promise().then((data) => {
+      res.send(JSON.stringify({'status': 'ok', 'pubkey': pubkey.toString('hex')}))
+    }).catch((err) => {
+      res.send(JSON.stringify({'error': err}))
+    })
+});
+
+app.post('/perma_fetch', function (req, res) {
+    var pubkey = Buffer.from(req.body.pubkey, 'hex')
+    var s3key_pubkeyhash = crypto.createHash('sha256').update(pubkey).digest().toString('hex')
+    var data = { sig: req.body.sig, recovery: req.body.recovery, data: req.body.data }
+    let params_1 = {Bucket: 'z-permastore', Key: s3key_pubkeyhash}
+    s3.getObject(params_1).promise().then((data) => {
+      res.send(JSON.stringify({'data' : JSON.parse(data.Body)}))
+    }).catch((err) => {
+      res.send(JSON.stringify({'error': err}))
+    })
+});
+
 app.get('/health', function (req, res) {
   res.send(JSON.stringify({'notdead' : true}))
 })

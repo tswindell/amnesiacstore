@@ -110,6 +110,37 @@ async function test()
       'data': JSON.stringify(fms_bundle)
     })
     console.log('health response ' + JSON.stringify(response5))
+
+    url = fms + '/perma_store'
+    data = '000000'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+    sig = secp256k1.sign(hash, authkey)
+    fms_bundle = { 'data': data, 'sig' : sig.signature.toString('hex'), 'recovery' : sig.recovery }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response6 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    
+    console.log('perma_store response ' + JSON.stringify(response6))
+
+    url = fms + '/perma_fetch'
+    console.log('asking with ' + authpubkey.toString('hex'))
+    fms_bundle = { 'pubkey' : authpubkey.toString('hex') }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response7 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('perma_fetch response ' + JSON.stringify(response7))
 }
 
 test().then(() => {}).catch((error) => {
