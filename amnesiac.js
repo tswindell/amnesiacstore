@@ -139,11 +139,6 @@ app.post('/revoke', function (req, res) {
 });
 
 app.post('/perma_store', function (req, res) {
-    if (req.body.data.length > 2048) {
-      res.send(JSON.stringify({'status': 'error'}))
-      return
-    }
-
     var signature = Buffer.from(req.body.sig, 'hex')
     var recovery = req.body.recovery
     var hash = crypto.createHash('sha256').update(Buffer.from(req.body.data, 'hex')).digest()
