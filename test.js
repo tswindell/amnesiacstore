@@ -141,6 +141,36 @@ async function test()
       'data': JSON.stringify(fms_bundle)
     })
     console.log('perma_fetch response ' + JSON.stringify(response7))
+
+    url = fms + '/ipfs_store'
+    data = '000002'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+    fms_bundle = { 'data': data }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response8 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('ipfs_store response ' + JSON.stringify(response8))
+
+    url = fms + '/ipfs_fetch'
+    data = '000002'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest().toString('hex')
+    fms_bundle = { 'hash': hash }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response9 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('ipfs_fetch response ' + JSON.stringify(response9))
 }
 
 test().then(() => {}).catch((error) => {

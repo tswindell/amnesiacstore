@@ -154,6 +154,27 @@ app.post('/perma_store', function (req, res) {
     })
 });
 
+app.post('/ipfs_store', function (req, res) {
+    var hash = crypto.createHash('sha256').update(Buffer.from(req.body.data, 'hex')).digest().toString('hex')
+    let params_1 = {Bucket: 'z-permastore', Key: hash, Body: JSON.stringify({data: req.body.data})}
+    
+    s3.upload(params_1).promise().then((data) => {
+      res.send(JSON.stringify({'status': 'ok', 'hash': hash}))
+    }).catch((err) => {
+      res.send(JSON.stringify({'error': err}))
+    })
+});
+
+app.post('/ipfs_fetch', function (req, res) {
+    let params_1 = {Bucket: 'z-permastore', Key: req.body.hash}
+    s3.getObject(params_1).promise().then((data) => {
+      res.send(JSON.stringify({'data' : JSON.parse(data.Body).data}))
+    }).catch((err) => {
+      res.send(JSON.stringify({'error': err}))
+    })
+});
+
+
 app.post('/perma_fetch', function (req, res) {
     var pubkey = Buffer.from(req.body.pubkey, 'hex')
     var s3key_pubkeyhash = crypto.createHash('sha256').update(pubkey).digest().toString('hex')
