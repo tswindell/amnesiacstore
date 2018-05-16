@@ -54,7 +54,7 @@ var awsconfig = new AWS.Config({
 
 var s3 = new AWS.S3({params: 'fms'})
 app.use(cors());
-app.use(bodyParser.json()); // support json encoded bodies
+app.use(bodyParser.json({limit: '50mb'})); // support json encoded bodies
 
 app.post('/store', function (req, res) {
     if (req.body.data.length > 1024) {
