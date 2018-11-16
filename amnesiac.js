@@ -97,7 +97,7 @@ app.post('/fetch', function (req, res) {
     var signature = Buffer.from(req.body.sig, 'hex');
     var recovery = req.body.recovery;
 
-    var hash = crypto.createHash('sha256').update(req.body.timestamp).digest();
+    var hash = req.body.hash ? Buffer.from(req.body.hash, 'hex') : crypto.createHash('sha256').update(req.body.timestamp).digest();
     // XXX check that timestamp is within acceptable timing of now
     var pubkey = secp256k1.publicKeyConvert(secp256k1.recover(hash, signature, recovery), false);
     
