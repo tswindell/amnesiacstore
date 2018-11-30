@@ -171,9 +171,57 @@ async function test()
       'data': JSON.stringify(fms_bundle)
     })
     console.log('ipfs_fetch response ' + JSON.stringify(response9))
+
+    url = fms + '/mailbox_store'
+    data = '000002'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+    fms_bundle = { 'data': data, 'recipient': data }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response10 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('mailbox_store response ' + JSON.stringify(response10))
+
+    url = fms + '/mailbox_list'
+    data = '000002'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+    fms_bundle = { 'recipient': data }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response11 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('mailbox_list response ' + JSON.stringify(response11))
+    
+    var list = JSON.parse(response11.responseText).response
+    list.forEach(async function(content) {
+      url = fms + '/mailbox_fetch'
+      data = '000002'
+      hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+      fms_bundle = { 'recipient': data, 'hash': content }
+      xhrPromise = new XMLHttpRequestPromise()
+      let response12 = await xhrPromise.send({
+        'method': 'POST',
+        'url': url,
+        'headers': {
+          'Content-Type': 'application/json;charset=UTF-8'
+         },
+         'data': JSON.stringify(fms_bundle)
+      })
+      console.log('mailbox_fetch response ' + JSON.stringify(response12))
+    })
 }
 
 test().then(() => {}).catch((error) => {
-  console.log('error: ' + JSON.stringify(error))
+  console.log('error: ' + error)
 })
 

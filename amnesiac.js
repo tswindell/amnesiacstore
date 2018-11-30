@@ -187,6 +187,46 @@ app.post('/perma_fetch', function (req, res) {
     })
 });
 
+app.post('/mailbox_store', function (req, res) { 
+   var mbox_hash = crypto.createHash('sha256').update(Buffer.from(req.body.recipient, 'hex')).digest().toString('hex')
+   var attached_data = Buffer.from(req.body.data, 'hex')
+   var ad_hash = crypto.createHash('sha256').update(attached_data).digest().toString('hex')
+   var data = { data: req.body.data }
+   let params_1 = {Bucket: 'z-permastore', Key: 'mbox/' + mbox_hash + '/' + ad_hash, Body: Buffer.from(req.body.data)}
+   s3.upload(params_1).promise().then((data) => {
+     res.send(JSON.stringify({'status': 'ok', 'key': 'mbox/' + mbox_hash + '/' + ad_hash}))
+   }).catch((err) => {
+     res.send(JSON.stringify({'error': err}))
+   })
+})
+
+app.post('/mailbox_list', function (req, res) { 
+   // FIXME: add ability for truncated lists (>1000 objects)
+   var mbox_hash = crypto.createHash('sha256').update(Buffer.from(req.body.recipient, 'hex')).digest().toString('hex')
+   let params_1 = {Bucket: 'z-permastore', Prefix: 'mbox/' + mbox_hash + '/'}
+   s3.listObjectsV2(params_1).promise().then((data) => {
+     var allKeys = []
+     data.Contents.forEach(function (content) {
+        allKeys.push(content.Key.replace('mbox/' + mbox_hash + '/', ''));
+     });
+     res.send(JSON.stringify({'status': 'ok', 'response': allKeys}))
+   }).catch((err) => {
+     res.send(JSON.stringify({'error': err}))
+   })
+})
+
+app.post('/mailbox_fetch', function (req, res) {
+   var mbox_hash = crypto.createHash('sha256').update(Buffer.from(req.body.recipient, 'hex')).digest().toString('hex')
+   let params_1 = {Bucket: 'z-permastore', Key: 'mbox/' + mbox_hash + '/' + req.body.hash}
+   s3.getObject(params_1).promise().then((data) => {
+     res.send({data: data})
+   }).catch((err) => {
+     res.send(JSON.stringify({'error': err}))
+   })
+});
+
+
+
 app.get('/health', function (req, res) {
   res.send(JSON.stringify({'notdead' : true}))
 })
