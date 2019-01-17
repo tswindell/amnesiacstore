@@ -219,6 +219,22 @@ async function test()
       })
       console.log('mailbox_fetch response ' + JSON.stringify(response12))
     })
+
+    url = fms + '/ipfs_store_v2'
+    data = '52'
+    hash = shajs('sha256').update(Buffer.from(data, 'hex')).digest()
+    fms_bundle = { 'data': data }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response13 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('ipfs_store_v2 response ' + JSON.stringify(response13))
+
 }
 
 test().then(() => {}).catch((error) => {

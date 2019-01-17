@@ -45,7 +45,8 @@ const crypto = require('crypto');
 var secp256k1 = require('secp256k1');
 var shajs = require('sha.js');
 var AWS = require('aws-sdk')
-
+var Unixfs = require('ipfs-unixfs')
+var dagPB = require('ipld-dag-pb')
 
 var myCredentials = new AWS.SharedIniFileCredentials({profile: 'default'});
 var awsconfig = new AWS.Config({
@@ -154,6 +155,30 @@ app.post('/perma_store', function (req, res) {
     })
 });
 
+app.post('/ipfs_store_v2', function (req, res) {
+   var buf = Buffer.from(req.body.data, 'hex')
+   var ufs = new Unixfs('file', buf)
+   dagPB.DAGNode.create(ufs.marshal(), (err, dagNode) => { 
+     if (err) {
+        res.send(JSON.stringify({'error': err}))
+     } else {
+        dagPB.util.cid(dagNode, {}, (err, cid) => { 
+          if (err) {
+             res.send(JSON.stringify({'error': err}))
+             return
+          }
+          var multihash = cid.toBaseEncodedString('base58btc')
+          let params_1 = {Bucket: 'z-permastore2', Key: 'ipfs/' + multihash, Body: buf}
+            s3.upload(params_1).promise().then((data) => {
+              res.send(JSON.stringify({'status': 'ok', 'multihash': multihash}))
+            }).catch((err) => {
+              res.send(JSON.stringify({'error': err}))
+            })
+        })
+      }
+   })
+})
+
 app.post('/ipfs_store', function (req, res) {
     var hash = crypto.createHash('sha256').update(Buffer.from(req.body.data, 'hex')).digest().toString('hex')
     let params_1 = {Bucket: 'z-permastore', Key: hash, Body: JSON.stringify({data: req.body.data})}
@@ -236,3 +261,4 @@ var server = app.listen(8081, "0.0.0.0", function () {
   var port = server.address().port
   console.log("Amnesiac app listening at http://%s:%s", host, port)
 })
+
