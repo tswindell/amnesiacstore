@@ -168,7 +168,7 @@ app.post('/ipfs_store_v2', function (req, res) {
              return
           }
           var multihash = cid.toBaseEncodedString('base58btc')
-          let params_1 = {Bucket: 'z-permastore2', Key: 'ipfs/' + multihash, Body: buf}
+          let params_1 = {Bucket: 'z-permastore2', Key: 'public/ipfs/' + multihash, Body: buf, ACL: 'public-read'}
             s3.upload(params_1).promise().then((data) => {
               res.send(JSON.stringify({'status': 'ok', 'multihash': multihash}))
             }).catch((err) => {
