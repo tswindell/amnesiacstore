@@ -40,6 +40,7 @@
 var express = require('express');
 var cors = require('cors');
 var app = express();
+const CID = require('cids')
 var bodyParser = require('body-parser');
 const crypto = require('crypto');
 var secp256k1 = require('secp256k1');
@@ -154,6 +155,117 @@ app.post('/perma_store', function (req, res) {
       res.send(JSON.stringify({'error': err}))
     })
 });
+
+app.post('/perma_store_v2', function (req, res) {
+   /* 
+   'timestamp': TIMESTAMP
+   'cid': '',
+   'signature': {
+      recovery: int
+      signature: hexstring
+   }
+   */
+   function makebuf(cid, ts) { 
+     var cidobj = new CID(cid)
+     var buf = Buffer.alloc(4 + cidobj.buffer.length, 0x00)
+     cidobj.buffer.copy(buf, 4, 0, cidobj.buffer.length)
+     buf.writeUInt32LE(ts, 0)
+     return buf   
+   }
+   
+   var buf = makebuf(req.body.cid, req.body.timestamp)
+   var msg = shajs('sha256').update(buf).digest()
+
+   var sigObj = {signature: Buffer.from(req.body.signature.signature, 'hex'), recovery: req.body.signature.recovery}
+   var t = secp256k1.publicKeyConvert(secp256k1.recover(msg, sigObj.signature, sigObj.recovery), true).toString('hex')
+   var newfile = Buffer.from(JSON.stringify({
+     timestamp: req.body.timestamp,
+     cid: req.body.cid,
+     signature: {
+       recovery: req.body.signature.recovery,
+       signature: req.body.signature.signature
+     }
+   }))
+   
+   // self-test
+   /*
+   { 
+     var nf = JSON.parse(newfile.toString('utf8'))
+     var buf = makebuf(nf.cid, nf.timestamp)
+     var msg = shajs('sha256').update(buf).digest()
+
+     var sigObj = {signature: Buffer.from(nf.signature.signature, 'hex'), recovery: nf.signature.recovery}
+     var nt = secp256k1.publicKeyConvert(secp256k1.recover(msg, sigObj.signature, sigObj.recovery), true).toString('hex')
+     if (nt !== t) {
+        res.send(JSON.stringify({'error': 'self test failed'}))
+        return
+     }
+   } */
+   
+   var ufs = new Unixfs('file', newfile)
+   dagPB.DAGNode.create(ufs.marshal(), (err, dagNode) => { 
+     if (err) {
+        res.send(JSON.stringify({'error': err}))
+     } else {
+        dagPB.util.cid(dagNode, {}, (err, cid) => { 
+          if (err) {
+             res.send(JSON.stringify({'error': err}))
+             return
+          }
+          var multihash = cid.toBaseEncodedString('base58btc')
+          var path = t + '/' + req.body.timestamp + '.' + req.body.cid + '.' + multihash
+          let params_1 = {Bucket: 'z-permastore2', Key: 'public/ipfs/' + multihash, Body: newfile, ACL: 'public-read'}
+          s3.upload(params_1).promise().then((data) => {
+            let params_2 = {Bucket: 'z-permastore2', Key: 'public/permastore/' + path, Body: '', ACL: 'public-read'}
+            s3.upload(params_2).promise().then((data) => {
+              res.send(JSON.stringify({'status': 'ok', 'path': path}))
+            }).catch((err) => {
+              res.send(JSON.stringify({'error': err}))
+            })
+          }).catch((err) => {
+            res.send(JSON.stringify({'error': err}))
+          })
+        })
+     }
+   })
+})
+
+app.post('/perma_list_v2', function (req, res) { 
+   // FIXME: add ability for truncated lists (>1000 objects)
+   let params_1 = {Bucket: 'z-permastore2', Prefix: 'public/permastore/' + req.body.pubkey + '/'}
+   s3.listObjectsV2(params_1).promise().then((data) => {
+     var allKeys = []
+     data.Contents.forEach(function (content) {
+        allKeys.push(content.Key.replace('public/permastore/' + req.body.pubkey + '/', ''));
+     })
+     allSortedKeys = allKeys.sort(function(a,b) {
+        var as = a.split('.')
+        var bs = b.split('.')
+        if (Number(as[0]) < Number(bs[0])) {
+          return -1
+        } else if (Number(as[0]) == Number(bs[0])) {
+          if (as[1] < bs[1]) {
+            return -1
+          } else if (as[1] == bs[1]) {
+            if (as[2] < bs[2]) {
+              return -1
+            } else if (as[2] == bs[2]) {
+              return 0
+            } else {
+              return 1
+            }
+          } else {
+            return 1
+          }
+        } else {
+          return 1
+        }
+     })
+     res.send(JSON.stringify({'status': 'ok', 'response': allSortedKeys}))
+   }).catch((err) => {
+     res.send(JSON.stringify({'error': err}))
+   })
+})
 
 app.post('/ipfs_store_v2', function (req, res) {
    var buf = Buffer.from(req.body.data, 'hex')

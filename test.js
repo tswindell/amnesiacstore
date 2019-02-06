@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const eccrypto = require('eccrypto');
 var secp256k1 = require('secp256k1')
+const CID = require('cids')
 var shajs = require('sha.js')
 global.window = global
 global.XMLHttpRequest = require('w3c-xmlhttprequest').XMLHttpRequest;
@@ -234,7 +235,49 @@ async function test()
       'data': JSON.stringify(fms_bundle)
     })
     console.log('ipfs_store_v2 response ' + JSON.stringify(response13))
+    
+    for (i = 0; i < 50; i++) {
+    
+    url = fms + '/perma_store_v2'
+    function makebuf(cid, ts) { 
+      var cidobj = new CID(cid)
+      var buf = Buffer.alloc(4 + cidobj.buffer.length, 0x00)
+      cidobj.buffer.copy(buf, 4, 0, cidobj.buffer.length)
+      buf.writeUInt32LE(ts, 0)
+      return buf   
+    }
 
+    buf = makebuf('QmWATWQ7fVPP2EFGu71UkfnqhYXDYH566qy47CnJDgvs8u', i)
+    hash = shajs('sha256').update(buf).digest()
+    sig = secp256k1.sign(hash, authkey)
+    fms_bundle = { timestamp: i, cid: 'QmWATWQ7fVPP2EFGu71UkfnqhYXDYH566qy47CnJDgvs8u', signature: { signature: sig.signature.toString('hex'), 'recovery' : sig.recovery } }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response14 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    
+    console.log('perma_store_v2 response ' + JSON.stringify(response14))
+
+    }
+    console.log('asking for perma list v2 ' + secp256k1.publicKeyConvert(authpubkey, true).toString('hex'))
+    url = fms + '/perma_list_v2'
+    fms_bundle = { 'pubkey': secp256k1.publicKeyConvert(authpubkey, true).toString('hex') }
+    xhrPromise = new XMLHttpRequestPromise()
+    let response15 = await xhrPromise.send({
+      'method': 'POST',
+      'url': url,
+      'headers': {
+        'Content-Type': 'application/json;charset=UTF-8'
+      },
+      'data': JSON.stringify(fms_bundle)
+    })
+    console.log('perma_list_v2 response ' + JSON.stringify(response15))
+    
 }
 
 test().then(() => {}).catch((error) => {
