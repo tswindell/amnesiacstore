@@ -59,7 +59,7 @@ app.use(cors());
 app.use(bodyParser.json({limit: '50mb'})); // support json encoded bodies
 
 app.post('/store', function (req, res) {
-    if (req.body.data.length > 1024) {
+    if (req.body.data.length > 4096) {
       res.send(JSON.stringify({'status': 'error'}))
       return
     }
